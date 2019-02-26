@@ -50,29 +50,33 @@ class HxapiGSheets(object):
         return nicknames
 
 
-    def parse_intake_assignment_rows(self, intake_rows):
-        # map required headers to known strings
-        headers = []
-        intake_headers = intake_rows[0]
-        for header in intake_headers:
+    def map_rows_into_dict(self, item_keys_map, input_rows):
+        # translate headers to known strings
+        # and map each row from input_rows into a list of dicts
+        key_headers = []
+        input_headers = input_rows[0]
+        for ih in input_headers:
             found = False
-            for h_key in HXYDRA_INTAKE_HEADER_KEYS:
-                if h_key in header.lower():
-                    headers.append(HXYDRA_INTAKE_HEADER_MAP[h_key])
+            for h_key in item_keys_map:
+                # beware that item_keys_map.key is a substring of input_header
+                # so item_keys_map.key should be distinctive enough to match
+                # only the input_header is meant to translate to!
+                if h_key in ih.lower():
+                    key_headers.append(item_keys_map[h_key])
                     found = True
                     break
-            if not found:
+            if not found:  # extra header, adding just in case
                 # remove non-work chars
-                clean_header = re.sub(r'\W', '_', header.lower())
-                headers.append(clean_header)
+                clean_header = re.sub(r'\W', '_', ih.lower())
+                key_headers.append(clean_header)
 
-        assignment_list = []
+        item_list = []
 
-        for row in intake_rows[1:]:  # skip row of headers
-            assignment = {k: v for k,v in zip(headers, row)}
-            assignment_list.append(assignment)
+        for row in input_rows[1:]:  # skip row of headers
+            item = {k: v for k,v in zip(key_headers, row)}
+            item_list.append(item)
 
-        return assignment_list
+        return item_list
 
 
 
@@ -127,8 +131,10 @@ if __name__ == '__main__':
         print('missing INTAKE_SHEET_ID')
         exit(1)
 
-    intake = hsheets.parse_intake_assignment_rows(intake_assignment_rows)
-    print('INTAKE: {}'.format(intake))
+    intake = hsheets.map_rows_into_dict(HXYDRA_INTAKE_HEADER_MAP, intake_assignment_rows)
+
+    import json
+    print('INTAKE: {}'.format(json.dumps(intake, indent=4)))
 
 
 
