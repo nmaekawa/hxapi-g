@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from itertools import zip_longest
 import logging
 import os
 import re
@@ -20,6 +21,24 @@ HXYDRA_INTAKE_HEADER_MAP = {
 }
 # unpack dict keys into a list; python>=3.5
 HXYDRA_INTAKE_HEADER_KEYS = [*HXYDRA_INTAKE_HEADER_MAP]
+
+
+HXYDRA_SLATE_HEADER_MAP = {
+    'launch date': 'launch_date',
+    'end date': 'end_date',
+    'project nickname': 'course_nickname',
+    'project title': 'course_title',
+    'project lead': 'project_lead',
+    'other team members': 'other_team_members',
+    'duration _wks': 'duration_in_weeks',
+    'platform': 'platform',
+    'common project name': 'course_group_name',
+    'approximate course id for courses on edx.org only': 'context_id',
+    'public course url': 'public_edx_url',
+}
+HXYDRA_USERS_HEADER_MAP = {
+    'row': 'row',
+}
 
 
 logger = logging.getLogger(__name__)
@@ -58,10 +77,7 @@ class HxapiGSheets(object):
         for ih in input_headers:
             found = False
             for h_key in item_keys_map:
-                # beware that item_keys_map.key is a substring of input_header
-                # so item_keys_map.key should be distinctive enough to match
-                # only the input_header is meant to translate to!
-                if h_key in ih.lower():
+                if h_key == ih.lower():
                     key_headers.append(item_keys_map[h_key])
                     found = True
                     break
@@ -73,7 +89,7 @@ class HxapiGSheets(object):
         item_list = []
 
         for row in input_rows[1:]:  # skip row of headers
-            item = {k: v for k,v in zip(key_headers, row)}
+            item = {k: v for k,v in zip_longest(key_headers, row)}
             item_list.append(item)
 
         return item_list
@@ -88,6 +104,7 @@ if __name__ == '__main__':
         SLATE_SHEET_ID: spreadsheet id
         INTAKE_SHEET_ID: spreadsheet id
     """
+    import json
 
     credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', None)
     if credentials_path:
@@ -99,13 +116,13 @@ if __name__ == '__main__':
         print('missing GOOGLE_APPLICATION_CREDENTIALS')
         exit(1)
 
-    print(
-        'project_id: {}; scopes: {}, token: {}'.format(
-            credentials.project_id,
-            credentials.scopes,
-            credentials.token,
-        )
-    )
+    #print(
+    #    'project_id: {}; scopes: {}, token: {}'.format(
+    #        credentials.project_id,
+    #        credentials.scopes,
+    #        credentials.token,
+    #    )
+    #)
 
     gsheets = GSheets(credentials)
     hsheets = HxapiGSheets(gsheets)
@@ -117,6 +134,32 @@ if __name__ == '__main__':
         print('missing SLATE_SHEET_ID')
         exit(1)
 
+
+    # range for all info in the slate
+    slate_rows = gsheets.get_range(
+        slate_sheet_id,
+        'A:AF',
+    )
+    #print('slate results have ({}) rows'.format(len(slate_rows)))
+    #print('{}'.format(json.dumps(slate_rows, indent=4)))
+    #print('{}'.format(json.dumps(slate_rows[0], indent=4)))
+
+    slate_items = hsheets.map_rows_into_dict(
+        HXYDRA_SLATE_HEADER_MAP,
+        slate_rows,
+    )
+
+    # cleanup a little
+    for item in slate_items:
+        nickname = item['course_nickname'].lower()
+        course_group = nickname.split('_')[0]
+        item['course_nickname'] = nickname
+        item['course_group'] = course_group
+
+    print('{}'.format(json.dumps(slate_items, indent=4)))
+
+
+    '''
     print('NICKNAMES({}): {}'.format(
         len(nicknames), nicknames
     ))
@@ -133,10 +176,21 @@ if __name__ == '__main__':
 
     intake = hsheets.map_rows_into_dict(HXYDRA_INTAKE_HEADER_MAP, intake_assignment_rows)
 
-    import json
     print('INTAKE: {}'.format(json.dumps(intake, indent=4)))
+    '''
 
+    users_sheet_id = os.getenv('USERNAME_SHEET_ID', None)
+    if not users_sheet_id:
+        print('missing USERNAME_SHEET_ID')
+        exit(1)
 
+    users_row = gsheets.get_range(users_sheet_id, 'A:F')
+    users_items = hsheets.map_rows_into_dict(
+        HXYDRA_USERS_HEADER_MAP, users_row)
+
+    #print(json.dumps(users_items, indent=4))
+
+    # range for usernames
 
 
 
