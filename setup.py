@@ -48,7 +48,6 @@ setup(
     packages=find_packages(exclude=['tests*']),
     include_package_data=True,
     install_requires=requirements,
-    dependency_links=dependencies,
     zip_safe=False,
     keywords='hx googlesheets ' + project_name,
     classifiers=[
