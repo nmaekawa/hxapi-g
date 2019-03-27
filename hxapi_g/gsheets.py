@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from itertools import zip_longest
 import logging
 import re
 import os
@@ -28,7 +29,7 @@ class GSheets(object):
     def get_credentials(cls, credentials_path):
         """ read google creds from file.
 
-        throws FileNotFoundErros if credentials_path not readable
+        throws FileNotFoundError if credentials_path not readable
         """
         credentials = service_account.Credentials \
                 .from_service_account_file(
@@ -68,13 +69,44 @@ class GSheets(object):
         return request.get('sheets', [])
 
 
-    def find_id_from_link(spreadsheet_link):
+    @classmethod
+    def find_id_from_link(cls, spreadsheet_link):
         matches = GSHEETS_DOCLINK_REGEX.match(spreadsheet_link)
         if matches:
-            return matches.group(0)
+            return matches.group(1)
         else:
             return None
 
+
+    @classmethod
+    def map_rows_into_dict(self, item_keys_map, input_rows):
+        """turn input_rows into list of dicts with item_keys_map as keys.
+
+        translates input headers to known strings
+        map each row in input_rows into dict, using translated headers as keys
+        result dict contains all keys in input_rows, translated or not
+        """
+        key_headers = []
+        input_headers = input_rows[0]
+        for ih in input_headers:
+            found = False
+            for h_key in item_keys_map:
+                if h_key == ih.lower():
+                    key_headers.append(item_keys_map[h_key])
+                    found = True
+                    break
+            if not found:  # extra header, adding just in case
+                # remove non-word chars
+                clean_header = re.sub(r'\W', '_', ih.lower())
+                key_headers.append(clean_header)
+
+        item_list = []
+
+        for row in input_rows[1:]:  # skip row of headers
+            item = {k: v for k,v in zip_longest(key_headers, row)}
+            item_list.append(item)
+
+        return item_list
 
 
 if __name__ == '__main__':
@@ -125,9 +157,9 @@ if __name__ == '__main__':
         exit(1)
 
     sheet_link = os.getenv('SPREADSHEET_LINK', None)
-    if link:
-        sid = gsheets.find_id_from_link(sheet_link)
-        print('id from link: {}'.format(sid))
+    if sheet_link:
+        sid = GSheets.find_id_from_link(sheet_link)
+        print('id({}) from link({})'.format(sid, sheet_link))
     else:
         print('missing SPREADSHEET_LINK')
         exit(1)
