@@ -44,57 +44,6 @@ HXYDRA_USERS_HEADER_MAP = {
 logger = logging.getLogger(__name__)
 
 
-class HxapiGSheets(object):
-
-    def __init__(self, gsheets):
-        self.gs = gsheets
-
-
-    def get_nicknames(self, sheet_id):
-        nickname_ranges = self.gs.get_range(
-            sheet_id,
-            HXYDRA_SLATE_PROJECT_NICKNAME_RANGE,
-        )
-
-        nicknames = []
-        items = nickname_ranges
-        for item in items:
-            nick = item[0].strip()
-            if nick \
-               and nick not in ['TBD', 'Project Nickname'] \
-               and nick not in nicknames:
-                nicknames.append(nick)
-
-        nicknames.sort()
-        return nicknames
-
-
-    def map_rows_into_dict(self, item_keys_map, input_rows):
-        # translate headers to known strings
-        # and map each row from input_rows into a list of dicts
-        key_headers = []
-        input_headers = input_rows[0]
-        for ih in input_headers:
-            found = False
-            for h_key in item_keys_map:
-                if h_key == ih.lower():
-                    key_headers.append(item_keys_map[h_key])
-                    found = True
-                    break
-            if not found:  # extra header, adding just in case
-                # remove non-work chars
-                clean_header = re.sub(r'\W', '_', ih.lower())
-                key_headers.append(clean_header)
-
-        item_list = []
-
-        for row in input_rows[1:]:  # skip row of headers
-            item = {k: v for k,v in zip_longest(key_headers, row)}
-            item_list.append(item)
-
-        return item_list
-
-
 
 if __name__ == '__main__':
     """ main() works as usage example and live test.
@@ -125,26 +74,23 @@ if __name__ == '__main__':
     #)
 
     gsheets = GSheets(credentials)
-    hsheets = HxapiGSheets(gsheets)
 
     slate_sheet_id = os.getenv('SLATE_SHEET_ID', None)
     if slate_sheet_id:
-        nicknames = hsheets.get_nicknames(slate_sheet_id)
+        # range for all info in the slate
+        slate_rows = gsheets.get_range(
+            slate_sheet_id,
+            'A:AF',
+        )
     else:
         print('missing SLATE_SHEET_ID')
         exit(1)
 
-
-    # range for all info in the slate
-    slate_rows = gsheets.get_range(
-        slate_sheet_id,
-        'A:AF',
-    )
     #print('slate results have ({}) rows'.format(len(slate_rows)))
     #print('{}'.format(json.dumps(slate_rows, indent=4)))
     #print('{}'.format(json.dumps(slate_rows[0], indent=4)))
 
-    slate_items = hsheets.map_rows_into_dict(
+    slate_items = GSheets.map_rows_into_dict(
         HXYDRA_SLATE_HEADER_MAP,
         slate_rows,
     )
@@ -160,10 +106,6 @@ if __name__ == '__main__':
 
 
     '''
-    print('NICKNAMES({}): {}'.format(
-        len(nicknames), nicknames
-    ))
-
     intake_sheet_id = os.getenv('INTAKE_SHEET_ID', None)
     if intake_sheet_id:
         intake_assignment_rows = gsheets.get_range(
@@ -174,7 +116,7 @@ if __name__ == '__main__':
         print('missing INTAKE_SHEET_ID')
         exit(1)
 
-    intake = hsheets.map_rows_into_dict(HXYDRA_INTAKE_HEADER_MAP, intake_assignment_rows)
+    intake = GSheets.map_rows_into_dict(HXYDRA_INTAKE_HEADER_MAP, intake_assignment_rows)
 
     print('INTAKE: {}'.format(json.dumps(intake, indent=4)))
     '''
@@ -185,10 +127,10 @@ if __name__ == '__main__':
         exit(1)
 
     users_row = gsheets.get_range(users_sheet_id, 'A:F')
-    users_items = hsheets.map_rows_into_dict(
+    users_items = GSheets.map_rows_into_dict(
         HXYDRA_USERS_HEADER_MAP, users_row)
 
-    #print(json.dumps(users_items, indent=4))
+    print(json.dumps(users_items, indent=4))
 
     # range for usernames
 
